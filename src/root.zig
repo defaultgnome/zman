@@ -3,6 +3,10 @@ const std = @import("std");
 const Io = std.Io;
 const known_folders = @import("known_folders");
 
+const build_options = @import("build_options");
+
+pub const version = build_options.version;
+
 pub const store_filename = "zman.json";
 
 pub const TaskTimeEntry = struct {
@@ -60,6 +64,17 @@ pub const StoreMut = struct {
         });
         return &self.tasks.items[self.tasks.items.len - 1];
     }
+
+    pub fn removeTask(self: *StoreMut, name: []const u8) bool {
+        for (self.tasks.items, 0..) |*task, task_index| {
+            if (!std.mem.eql(u8, task.name, name)) continue;
+            self.allocator.free(task.name);
+            task.times.deinit(self.allocator);
+            _ = self.tasks.swapRemove(task_index);
+            return true;
+        }
+        return false;
+    }
 };
 
 pub fn unixNow(io: Io) i64 {
@@ -84,14 +99,32 @@ pub fn taskTotalSeconds(task: StoreMut.TaskMut) u64 {
     return total;
 }
 
+pub fn configDirPath(
+    io: Io,
+    allocator: std.mem.Allocator,
+    environ: *const std.process.Environ.Map,
+) ![]const u8 {
+    return try known_folders.getPath(io, allocator, environ, .local_configuration) orelse {
+        return error.ConfigFolderUnavailable;
+    };
+}
+
+pub fn configFilePath(
+    io: Io,
+    allocator: std.mem.Allocator,
+    environ: *const std.process.Environ.Map,
+) ![]const u8 {
+    const config_path = try configDirPath(io, allocator, environ);
+    defer allocator.free(config_path);
+    return std.fs.path.join(allocator, &.{ config_path, store_filename });
+}
+
 pub fn openConfigDir(
     io: Io,
     allocator: std.mem.Allocator,
     environ: *const std.process.Environ.Map,
 ) !Io.Dir {
-    const config_path = try known_folders.getPath(io, allocator, environ, .local_configuration) orelse {
-        return error.ConfigFolderUnavailable;
-    };
+    const config_path = try configDirPath(io, allocator, environ);
     defer allocator.free(config_path);
 
     return try Io.Dir.cwd().createDirPathOpen(io, config_path, .{});
@@ -201,4 +234,26 @@ test taskTotalSeconds {
         .times = times,
     };
     try std.testing.expectEqual(@as(u64, 210), taskTotalSeconds(task));
+}
+
+test "removeTask" {
+    var store = StoreMut{
+        .allocator = std.testing.allocator,
+        .tasks = std.ArrayList(StoreMut.TaskMut).empty,
+    };
+    defer store.deinit();
+
+    try store.tasks.append(std.testing.allocator, .{
+        .name = try std.testing.allocator.dupe(u8, "keep"),
+        .times = std.ArrayList(TaskTimeEntry).empty,
+    });
+    try store.tasks.append(std.testing.allocator, .{
+        .name = try std.testing.allocator.dupe(u8, "drop"),
+        .times = std.ArrayList(TaskTimeEntry).empty,
+    });
+
+    try std.testing.expect(store.removeTask("drop"));
+    try std.testing.expectEqual(@as(usize, 1), store.tasks.items.len);
+    try std.testing.expectEqualStrings("keep", store.tasks.items[0].name);
+    try std.testing.expect(!store.removeTask("missing"));
 }

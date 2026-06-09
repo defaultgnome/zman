@@ -8,11 +8,17 @@ pub fn build(b: *std.Build) void {
     const known_folders_dep = b.dependency("known_folders", .{});
     const known_folders_mod = known_folders_dep.module("known-folders");
 
+    const package = @import("build.zig.zon");
+
+    const zman_options = b.addOptions();
+    zman_options.addOption([]const u8, "version", package.version);
+
     const mod = b.addModule("zman", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "known_folders", .module = known_folders_mod },
+            .{ .name = "build_options", .module = zman_options.createModule() },
         },
     });
 

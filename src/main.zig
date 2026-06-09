@@ -17,12 +17,108 @@ pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
 
     const args = try init.minimal.args.toSlice(arena);
-    if (args.len > 1) {
-        const task_name = try std.mem.join(arena, " ", args[1..]);
-        try runTimer(io, arena, init.environ_map, task_name);
-    } else {
+    if (args.len == 1) {
         try listTasks(io, arena, init.environ_map);
+        return;
     }
+
+    if (std.mem.eql(u8, args[1], "--version")) {
+        try printVersion(io);
+        return;
+    }
+
+    if (std.mem.eql(u8, args[1], "--config")) {
+        try printConfigPath(io, arena, init.environ_map);
+        return;
+    }
+
+    if (std.mem.eql(u8, args[1], "-D")) {
+        if (args.len < 3) {
+            try printCliError(io, "missing task name for -D");
+            std.process.exit(1);
+        }
+        const task_name = try std.mem.join(arena, " ", args[2..]);
+        try deleteTask(io, arena, init.environ_map, task_name);
+        return;
+    }
+
+    const task_name = try std.mem.join(arena, " ", args[1..]);
+    try runTimer(io, arena, init.environ_map, task_name);
+}
+
+fn printVersion(io: Io) !void {
+    var stdout_buffer: [64]u8 = undefined;
+    var stdout_writer = Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.print("{s}\n", .{zman.version});
+    try stdout.flush();
+}
+
+fn printConfigPath(
+    io: Io,
+    allocator: std.mem.Allocator,
+    environ: *const std.process.Environ.Map,
+) !void {
+    const config_path = try zman.configFilePath(io, allocator, environ);
+    defer allocator.free(config_path);
+
+    var stdout_buffer: [512]u8 = undefined;
+    var stdout_writer = Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.print("{s}\n", .{config_path});
+    try stdout.flush();
+}
+
+fn printCliError(io: Io, message: []const u8) !void {
+    var stderr_buffer: [256]u8 = undefined;
+    var stderr_writer = Io.File.stderr().writer(io, &stderr_buffer);
+    const stderr = &stderr_writer.interface;
+
+    try stderr.print("zman: {s}\n", .{message});
+    try stderr.flush();
+}
+
+fn confirmDelete(io: Io, task_name: []const u8) !bool {
+    var stdout_buffer: [256]u8 = undefined;
+    var stdout_writer = Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.print("Delete task '{s}'? [y/n] ", .{task_name});
+    try stdout.flush();
+
+    var stdin_buffer: [256]u8 = undefined;
+    var stdin_reader = Io.File.stdin().reader(io, &stdin_buffer);
+    const line = stdin_reader.interface.takeDelimiterExclusive('\n') catch |err| switch (err) {
+        error.EndOfStream => return false,
+        else => |e| return e,
+    };
+
+    const answer = std.mem.trim(u8, line, " \t\r");
+    return answer.len > 0 and (answer[0] == 'y' or answer[0] == 'Y');
+}
+
+fn deleteTask(
+    io: Io,
+    allocator: std.mem.Allocator,
+    environ: *const std.process.Environ.Map,
+    task_name: []const u8,
+) !void {
+    if (!try confirmDelete(io, task_name)) return;
+
+    var config_dir = try zman.openConfigDir(io, allocator, environ);
+    defer config_dir.close(io);
+
+    var store = try zman.loadStoreMut(io, allocator, config_dir);
+    defer store.deinit();
+
+    if (!store.removeTask(task_name)) {
+        try printCliError(io, "task not found");
+        std.process.exit(1);
+    }
+
+    try zman.saveStoreMut(io, config_dir, &store, allocator);
 }
 
 fn listTasks(
