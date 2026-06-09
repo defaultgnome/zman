@@ -5,20 +5,23 @@ pub fn build(b: *std.Build) void {
 
     const optimize = b.standardOptimizeOption(.{});
 
+    const known_folders_dep = b.dependency("known_folders", .{});
+    const known_folders_mod = known_folders_dep.module("known-folders");
+
     const mod = b.addModule("zman", .{
         .root_source_file = b.path("src/root.zig"),
-
         .target = target,
+        .imports = &.{
+            .{ .name = "known_folders", .module = known_folders_mod },
+        },
     });
 
     const exe = b.addExecutable(.{
         .name = "zman",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
-
             .target = target,
             .optimize = optimize,
-
             .imports = &.{
                 .{ .name = "zman", .module = mod },
             },
