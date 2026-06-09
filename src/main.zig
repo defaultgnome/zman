@@ -12,6 +12,26 @@ fn handleSigInt(_: posix.SIG) callconv(.c) void {
     timer_stop_requested.store(true, .seq_cst);
 }
 
+fn isFlag(arg: []const u8) bool {
+    return arg.len > 0 and arg[0] == '-';
+}
+
+fn exitUnknownFlag(io: Io, flag: []const u8) noreturn {
+    printCliError(io, "unknown flag: {s}", .{flag}) catch {};
+    std.process.exit(1);
+}
+
+fn exitInvalidTaskName(io: Io, task_name: []const u8) noreturn {
+    printCliError(io, "invalid task name: {s}", .{task_name}) catch {};
+    std.process.exit(1);
+}
+
+fn ensureTaskNameArgs(io: Io, args: []const []const u8) void {
+    for (args) |arg| {
+        if (isFlag(arg)) exitInvalidTaskName(io, arg);
+    }
+}
+
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const arena = init.arena.allocator();
@@ -22,28 +42,62 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
 
-    if (std.mem.eql(u8, args[1], "--version")) {
+    const first = args[1];
+    if (std.mem.eql(u8, first, "--help") or std.mem.eql(u8, first, "-h")) {
+        try printUsage(io);
+        return;
+    }
+
+    if (std.mem.eql(u8, first, "--version")) {
         try printVersion(io);
         return;
     }
 
-    if (std.mem.eql(u8, args[1], "--config")) {
+    if (std.mem.eql(u8, first, "--config")) {
         try printConfigPath(io, arena, init.environ_map);
         return;
     }
 
-    if (std.mem.eql(u8, args[1], "-D")) {
+    if (std.mem.eql(u8, first, "-D")) {
         if (args.len < 3) {
-            try printCliError(io, "missing task name for -D");
+            try printCliError(io, "missing task name for -D", .{});
             std.process.exit(1);
         }
+        ensureTaskNameArgs(io, args[2..]);
         const task_name = try std.mem.join(arena, " ", args[2..]);
         try deleteTask(io, arena, init.environ_map, task_name);
         return;
     }
 
+    if (isFlag(first)) exitUnknownFlag(io, first);
+
+    ensureTaskNameArgs(io, args[1..]);
     const task_name = try std.mem.join(arena, " ", args[1..]);
     try runTimer(io, arena, init.environ_map, task_name);
+}
+
+const usage =
+    \\Usage: zman [command] [options] [task-name]
+    \\
+    \\Commands:
+    \\  zman                      List all tasks with total time
+    \\  zman <task-name>          Start timer for task (Ctrl-C to stop)
+    \\
+    \\Options:
+    \\  -h, --help                Show this help
+    \\  --version                 Print version
+    \\  --config                  Print config file path
+    \\  -D <task-name>            Delete task (with confirmation)
+    \\
+;
+
+fn printUsage(io: Io) !void {
+    var stdout_buffer: [512]u8 = undefined;
+    var stdout_writer = Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.writeAll(usage);
+    try stdout.flush();
 }
 
 fn printVersion(io: Io) !void {
@@ -71,12 +125,14 @@ fn printConfigPath(
     try stdout.flush();
 }
 
-fn printCliError(io: Io, message: []const u8) !void {
+fn printCliError(io: Io, comptime fmt: []const u8, args: anytype) !void {
     var stderr_buffer: [256]u8 = undefined;
     var stderr_writer = Io.File.stderr().writer(io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
-    try stderr.print("zman: {s}\n", .{message});
+    try stderr.print("zman: ", .{});
+    try stderr.print(fmt, args);
+    try stderr.writeAll("\n");
     try stderr.flush();
 }
 
@@ -114,7 +170,7 @@ fn deleteTask(
     defer store.deinit();
 
     if (!store.removeTask(task_name)) {
-        try printCliError(io, "task not found");
+        try printCliError(io, "task not found", .{});
         std.process.exit(1);
     }
 
