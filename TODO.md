@@ -1,4 +1,5 @@
 ## TODO NOW
+- [ ] ctrl-c is killing the app on windows, add "ESC" to exit (or see if we can fix)
 - [ ] make all confirm `[y/n]` to `[Y/n]`, i.e. the default when enter is Yes
 - [ ] add a 'lap' functionality while running and printing the the current time of `start`
   - meaning that if i type something, when running, and then submit with enter, it will take the now time as a clock-out and add the label (a new optional field for the entry), and immediatly also start a new clock-in in the same session
