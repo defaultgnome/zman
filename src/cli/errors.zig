@@ -1,0 +1,74 @@
+const std = @import("std");
+
+pub const Formatted = struct {
+    message: []const u8,
+    hint: ?[]const u8 = null,
+};
+
+pub fn format(err: anyerror) Formatted {
+    return switch (err) {
+        error.UnknownCommand => .{
+            .message = "unknown command",
+            .hint = "Run 'zman --help' for available commands.",
+        },
+        error.UnknownFlag => .{
+            .message = "unknown flag",
+            .hint = "Run 'zman <command> -h' for command-specific options.",
+        },
+        error.UnexpectedFlag => .{
+            .message = "flag not valid for this command",
+            .hint = "Run 'zman <command> -h' for command-specific options.",
+        },
+        error.InvalidStartFlags => .{
+            .message = "incompatible start options",
+            .hint = "Use only one of: a task name, --last, or --git. Run 'zman start -h'.",
+        },
+        error.NoLastTask => .{
+            .message = "no previous task to restart",
+            .hint = "Start a task first with 'zman start <name>'.",
+        },
+        error.NotGitRepo => .{
+            .message = "not inside a git repository",
+            .hint = "Run from a directory with a .git folder, or pass a task name instead.",
+        },
+        error.MissingPattern => .{
+            .message = "missing delete pattern",
+            .hint = "Usage: zman delete <pattern>. Use '*' to match all tasks. Run 'zman delete -h'.",
+        },
+        error.NoMatchingTasks => .{
+            .message = "no tasks match the pattern",
+            .hint = "Check the pattern or run 'zman list' to see task names.",
+        },
+        error.MissingMergeArgs => .{
+            .message = "missing merge arguments",
+            .hint = "Usage: zman merge <from> <to>. Run 'zman merge -h'.",
+        },
+        error.MissingTaskName => .{
+            .message = "missing task name",
+            .hint = "Usage: zman show <task-name>. Run 'zman show -h'.",
+        },
+        error.TaskNotFound => .{
+            .message = "task not found",
+            .hint = "Run 'zman list' to see existing tasks.",
+        },
+        error.TimeOverlap => .{
+            .message = "cannot merge: time ranges overlap",
+            .hint = "Resolve overlapping entries before merging.",
+        },
+        error.SameTask => .{
+            .message = "cannot merge a task into itself",
+            .hint = "Provide two different task names.",
+        },
+        error.ConfigFolderUnavailable => .{
+            .message = "could not resolve config directory",
+            .hint = "Check that your home directory and XDG paths are accessible.",
+        },
+        else => .{ .message = @errorName(err) },
+    };
+}
+
+test format {
+    const f = format(error.NoLastTask);
+    try std.testing.expectEqualStrings("no previous task to restart", f.message);
+    try std.testing.expect(f.hint != null);
+}
