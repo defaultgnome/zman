@@ -93,6 +93,9 @@ With [fzf](https://github.com/junegunn/fzf) installed:
 # fuzzy-pick a task to inspect
 zman show "$(zman list --name-only | fzf)"
 
+# fuzzy-pick a task to delete
+zman delete "$(zman list --name-only | fzf)"
+
 # fuzzy-pick from/to for a merge
 zman merge \
   "$(zman list --name-only | fzf --prompt="from: ")" \

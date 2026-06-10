@@ -64,7 +64,7 @@ pub fn main(init: std.process.Init) !void {
 fn runTui(app: *App, _: cli_args.Parsed) !void {
     var buf: [256]u8 = undefined;
     var w = Io.File.stdout().writer(app.io, &buf);
-    try w.interface.writeAll("\x1b[2J\x1b[Hcoming soon\n");
+    try w.interface.writeAll("\x1b[2J\x1b[HTUI Coming Soon!\n");
     try w.interface.flush();
 }
 
