@@ -6,8 +6,10 @@ A small timer utility to track how much time you spend on tasks.
 
 ## Install
 
+Have `zig` v0.16.0 installed
+
 ```sh
-git clone <repo-url>
+git clone https://github.com/defaultgnome/zman
 cd zman
 zig build
 # copy zig-out/bin/zman somewhere on your PATH
