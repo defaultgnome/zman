@@ -181,7 +181,7 @@ fn runDelete(app: *App, parsed: cli_args.Parsed) !void {
         var w = Io.File.stdout().writer(app.io, &buf);
         try w.interface.writeAll("Will delete:\n");
         for (matches.items) |name| try w.interface.print("  {s}\n", .{name});
-        try w.interface.writeAll("Proceed? [y/n] ");
+        try w.interface.writeAll("Proceed? [Y/n] ");
         try w.interface.flush();
         if (!try readYes(app.io)) return;
     }
@@ -315,7 +315,8 @@ fn readYes(io: Io) !bool {
         else => |e| return e,
     };
     const answer = std.mem.trim(u8, line, " \t\r");
-    return answer.len > 0 and (answer[0] == 'y' or answer[0] == 'Y');
+    if (answer.len == 0) return true;
+    return answer[0] == 'y' or answer[0] == 'Y';
 }
 
 fn reportError(io: Io, err: anyerror) !void {
