@@ -59,6 +59,38 @@ pub fn format(err: anyerror) Formatted {
             .message = "cannot merge a task into itself",
             .hint = "Provide two different task names.",
         },
+        error.MissingLogFrom => .{
+            .message = "missing --from time",
+            .hint = "Usage: zman log <task-name> --from=<time> --to=<time>. Run 'zman log -h'.",
+        },
+        error.MissingLogTo => .{
+            .message = "missing --to time",
+            .hint = "Usage: zman log <task-name> --from=<time> --to=<time>. Run 'zman log -h'.",
+        },
+        error.MissingFlagValue => .{
+            .message = "flag requires a value",
+            .hint = "Run 'zman <command> -h' for command-specific options.",
+        },
+        error.InvalidTimeFormat => .{
+            .message = "invalid time format",
+            .hint = "Use HH:MM, HH:MM:SS, YYYY-MM-DD HH:MM, or YYYY-MM-DDTHH:MM:SS. Run 'zman log -h'.",
+        },
+        error.InvalidLogRange => .{
+            .message = "--from must be before --to",
+            .hint = "Provide a valid time range. Run 'zman log -h'.",
+        },
+        error.FutureTime => .{
+            .message = "time cannot be in the future",
+            .hint = "Use a clock-in/out time that is not later than now.",
+        },
+        error.NoTimeEntries => .{
+            .message = "task has no time entries",
+            .hint = "Start or log time for this task first.",
+        },
+        error.TimeEntryAlreadyClosed => .{
+            .message = "last time entry is already closed",
+            .hint = "Use 'zman start' to begin a new open entry.",
+        },
         error.ConfigFolderUnavailable => .{
             .message = "could not resolve config directory",
             .hint = "Check that your home directory and XDG paths are accessible.",

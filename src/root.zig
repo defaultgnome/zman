@@ -24,6 +24,7 @@ pub const formatTimestamp = time.formatTimestamp;
 pub const formatTimestampOpt = time.formatTimestampOpt;
 pub const timesOverlap = time.timesOverlap;
 pub const taskTotalSeconds = time.taskTotalSeconds;
+pub const parseTimeSpecifier = time.parseTimeSpecifier;
 
 pub const matchesPattern = pattern.matchesPattern;
 pub const gitBranchName = git.gitBranchName;

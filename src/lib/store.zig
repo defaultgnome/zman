@@ -110,6 +110,22 @@ pub const StoreMut = struct {
         for (from.times.items) |entry| try to.times.append(self.allocator, entry);
         _ = self.removeTask(from_name);
     }
+
+    pub fn stopLastOpenEntry(self: *StoreMut, name: []const u8, end: i64) !void {
+        const task = self.findTask(name) orelse return error.TaskNotFound;
+        if (task.times.items.len == 0) return error.NoTimeEntries;
+        const last = &task.times.items[task.times.items.len - 1];
+        if (last.end != null) return error.TimeEntryAlreadyClosed;
+        last.end = end;
+    }
+
+    pub fn addTimeEntry(self: *StoreMut, name: []const u8, entry: TaskTimeEntry) !void {
+        const task = try self.findOrCreateTask(name);
+        for (task.times.items) |existing| {
+            if (time.timesOverlap(existing, entry)) return error.TimeOverlap;
+        }
+        try task.times.append(self.allocator, entry);
+    }
 };
 
 pub fn nextUnnamedTaskName(store: *const StoreMut, allocator: std.mem.Allocator) ![]const u8 {

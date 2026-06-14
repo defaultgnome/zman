@@ -7,7 +7,9 @@ pub const global_text =
     \\  (none)          Open full-screen TUI (coming soon)
     \\  version         Print version
     \\  config          Print config file path
-    \\  start           Start a timer (Ctrl-C to stop)
+    \\  start           Start a timer (Ctrl-C or Esc to stop)
+    \\  stop            Close the last open time entry for a task
+    \\  log             Add a manual clock-in/clock-out entry
     \\  list            List all tasks with total time
     \\  delete          Delete tasks matching a glob pattern
     \\  merge           Merge one task's times into another
@@ -20,6 +22,8 @@ pub const global_text =
 pub fn commandText(cmd: cli_args.Command) ?[]const u8 {
     return switch (cmd) {
         .start => start_text,
+        .stop => stop_text,
+        .log => log_text,
         .list => list_text,
         .delete => delete_text,
         .merge => merge_text,
@@ -31,12 +35,41 @@ pub fn commandText(cmd: cli_args.Command) ?[]const u8 {
 const start_text =
     \\Usage: zman start [task-name] [options]
     \\
-    \\Start a timer for the given task. Press Ctrl-C to stop.
+    \\Start a timer for the given task.
+    \\On Unix, press Ctrl-C or Esc to stop. On Windows, press Esc.
     \\If no task name is given, an auto-generated name is used.
     \\
     \\Options:
     \\  --last          Restart the last started task
     \\  --git           Use the current git branch name as the task name
+    \\
+;
+
+const stop_text =
+    \\Usage: zman stop <task-name>
+    \\
+    \\Close the last open clock-out for the given task using the current time.
+    \\Errors if the task has no entries or the last entry is already closed.
+    \\
+;
+
+const log_text =
+    \\Usage: zman log <task-name> --from=<time> --to=<time>
+    \\
+    \\Add a manual clock-in/clock-out entry for a task.
+    \\Aborts if the range overlaps an existing entry or is in the future.
+    \\
+    \\Time formats (local time):
+    \\  HH:MM                   today at the given time
+    \\  HH:MM:SS                today at the given time
+    \\  YYYY-MM-DD HH:MM        full date and time
+    \\  YYYY-MM-DD HH:MM:SS     full date and time
+    \\  YYYY-MM-DDTHH:MM        ISO-style date and time
+    \\  YYYY-MM-DDTHH:MM:SS     ISO-style date and time
+    \\
+    \\Options:
+    \\  --from=<time>   Clock-in time (required)
+    \\  --to=<time>     Clock-out time (required)
     \\
 ;
 
@@ -76,6 +109,6 @@ const show_text =
     \\Usage: zman show <task-name>
     \\
     \\Print a human-readable log of all clock-in/clock-out entries
-    \\for the given task.
+    \\for the given task. Times are shown in your local timezone.
     \\
 ;

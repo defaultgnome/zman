@@ -9,6 +9,7 @@ const cli_args = @import("cli/args.zig");
 const cli_errors = @import("cli/errors.zig");
 const cli_output = @import("cli/output.zig");
 const usage = @import("cli/usage.zig");
+const timer_input = @import("cli/timer_input.zig");
 
 var timer_stop_requested = std.atomic.Value(bool).init(false);
 
@@ -44,6 +45,8 @@ pub fn main(init: std.process.Init) !void {
         .{ .cmd = .version, .run = runVersion },
         .{ .cmd = .config, .run = runConfig },
         .{ .cmd = .start, .run = runStart },
+        .{ .cmd = .stop, .run = runStop },
+        .{ .cmd = .log, .run = runLog },
         .{ .cmd = .list, .run = runList },
         .{ .cmd = .delete, .run = runDelete },
         .{ .cmd = .merge, .run = runMerge },
@@ -112,6 +115,45 @@ fn runStart(app: *App, parsed: cli_args.Parsed) !void {
     defer if (resolved.owned) app.allocator.free(resolved.name);
 
     try runTimer(app, config_dir, &store, resolved.name);
+}
+
+fn runStop(app: *App, parsed: cli_args.Parsed) !void {
+    if (parsed.positionals.len != 1) return error.MissingTaskName;
+
+    var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
+    defer config_dir.close(app.io);
+
+    var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
+    defer store.deinit();
+
+    const task_name = parsed.positionals[0];
+    try store.stopLastOpenEntry(task_name, zman.unixNow(app.io));
+    try store.setLastTask(task_name);
+    try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
+}
+
+fn runLog(app: *App, parsed: cli_args.Parsed) !void {
+    if (parsed.positionals.len != 1) return error.MissingTaskName;
+    const from_text = parsed.log_from orelse return error.MissingLogFrom;
+    const to_text = parsed.log_to orelse return error.MissingLogTo;
+
+    const now = zman.unixNow(app.io);
+    const from_epoch = try zman.parseTimeSpecifier(from_text, now);
+    const to_epoch = try zman.parseTimeSpecifier(to_text, now);
+
+    if (from_epoch >= to_epoch) return error.InvalidLogRange;
+    if (from_epoch > now or to_epoch > now) return error.FutureTime;
+
+    var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
+    defer config_dir.close(app.io);
+
+    var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
+    defer store.deinit();
+
+    const task_name = parsed.positionals[0];
+    try store.addTimeEntry(task_name, .{ .start = from_epoch, .end = to_epoch });
+    try store.setLastTask(task_name);
+    try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
 }
 
 const ResolvedTaskName = struct { name: []const u8, owned: bool };
@@ -232,6 +274,8 @@ fn runShow(app: *App, parsed: cli_args.Parsed) !void {
 }
 
 fn runTimer(app: *App, config_dir: Io.Dir, store: *zman.StoreMut, task_name: []const u8) !void {
+    timer_stop_requested.store(false, .seq_cst);
+
     const task = try store.findOrCreateTask(task_name);
     const start = zman.unixNow(app.io);
     try task.times.append(app.allocator, .{ .start = start, .end = null });
@@ -249,6 +293,9 @@ fn runTimer(app: *App, config_dir: Io.Dir, store: *zman.StoreMut, task_name: []c
         posix.sigaction(.INT, &act, null);
     }
 
+    var stdin_mode: ?timer_input.TimerInput = timer_input.TimerInput.init() catch null;
+    defer if (stdin_mode) |*mode| mode.deinit();
+
     var buf: [256]u8 = undefined;
     var w = Io.File.stdout().writer(app.io, &buf);
 
@@ -257,8 +304,20 @@ fn runTimer(app: *App, config_dir: Io.Dir, store: *zman.StoreMut, task_name: []c
     const terminal_mode = try Io.Terminal.Mode.detect(app.io, Io.File.stdout(), no_color, clicolor_force);
     var terminal: Io.Terminal = .{ .writer = &w.interface, .mode = terminal_mode };
 
+    const stop_hint = if (builtin.os.tag == .windows)
+        "press Esc to stop timer\n"
+    else
+        "press Ctrl-C or Esc to stop timer\n";
+
     var first_draw = true;
     while (!timer_stop_requested.load(.seq_cst)) {
+        if (stdin_mode) |mode| {
+            if (mode.escapePressed()) {
+                timer_stop_requested.store(true, .seq_cst);
+                break;
+            }
+        }
+
         const elapsed: u64 = @intCast(@max(zman.unixNow(app.io) - start, 0));
         var duration_buf: [32]u8 = undefined;
         const duration = zman.formatDurationSeconds(elapsed, &duration_buf);
@@ -270,7 +329,7 @@ fn runTimer(app: *App, config_dir: Io.Dir, store: *zman.StoreMut, task_name: []c
         try w.interface.print("{s}\n", .{task.name});
         try w.interface.print("{s}\n", .{duration});
         try terminal.setColor(.bright_black);
-        try w.interface.writeAll("press Ctrl-C to stop timer\n");
+        try w.interface.writeAll(stop_hint);
         try terminal.setColor(.reset);
         try w.interface.flush();
 

@@ -16,6 +16,7 @@ pub fn build(b: *std.Build) void {
     const mod = b.addModule("zman", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
+        .link_libc = true,
         .imports = &.{
             .{ .name = "known_folders", .module = known_folders_mod },
             .{ .name = "build_options", .module = zman_options.createModule() },
@@ -28,6 +29,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "zman", .module = mod },
             },

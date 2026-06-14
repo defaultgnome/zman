@@ -6,6 +6,8 @@ pub const Command = enum {
     version,
     config,
     start,
+    stop,
+    log,
     list,
     delete,
     merge,
@@ -20,6 +22,8 @@ pub const Parsed = struct {
     start_git: bool = false,
     list_name_only: bool = false,
     delete_yes: bool = false,
+    log_from: ?[]const u8 = null,
+    log_to: ?[]const u8 = null,
 };
 
 fn isFlag(arg: []const u8) bool {
@@ -66,11 +70,34 @@ pub fn parse(allocator: std.mem.Allocator, args: []const []const u8) !Parsed {
         } else if (std.mem.eql(u8, arg, "-y")) {
             if (cmd != .delete) return error.UnexpectedFlag;
             parsed.delete_yes = true;
+        } else if (try takeFlagValueArg(args, &i, "--from", &parsed.log_from)) {
+            if (cmd != .log) return error.UnexpectedFlag;
+        } else if (try takeFlagValueArg(args, &i, "--to", &parsed.log_to)) {
+            if (cmd != .log) return error.UnexpectedFlag;
         } else return error.UnknownFlag;
     }
 
     parsed.positionals = try positionals.toOwnedSlice(allocator);
     return parsed;
+}
+
+fn takeFlagValueArg(
+    args: []const []const u8,
+    index: *usize,
+    comptime flag: []const u8,
+    out: *?[]const u8,
+) !bool {
+    const arg = args[index.*];
+    const prefix = flag ++ "=";
+    if (std.mem.startsWith(u8, arg, prefix)) {
+        out.* = arg[prefix.len..];
+        return true;
+    }
+    if (!std.mem.eql(u8, arg, flag)) return false;
+    index.* += 1;
+    if (index.* >= args.len) return error.MissingFlagValue;
+    out.* = args[index.*];
+    return true;
 }
 
 pub fn freeParsed(allocator: std.mem.Allocator, parsed: *Parsed) void {
