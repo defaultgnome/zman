@@ -61,6 +61,41 @@ pub fn taskTotalSeconds(times: []const TaskTimeEntry) u64 {
     return total;
 }
 
+pub const TaskDateRange = struct {
+    start: ?i64 = null,
+    end: ?i64 = null,
+};
+
+/// Macro span from the first entry's clock-in through the last entry's clock-out,
+/// or clock-in when the last entry is still open.
+pub fn taskDateRange(times: []const TaskTimeEntry) TaskDateRange {
+    if (times.len == 0) return .{};
+    const last = times[times.len - 1];
+    return .{
+        .start = times[0].start,
+        .end = last.end orelse last.start,
+    };
+}
+
+pub fn taskDateRangeDayCount(range: TaskDateRange) ?u64 {
+    const start = range.start orelse return null;
+    const end = range.end orelse return null;
+    const start_day = local_time.localDayStart(start) catch return null;
+    const end_day = local_time.localDayStart(end) catch return null;
+    if (end_day < start_day) return 0;
+    const day_span_seconds: u64 = @intCast(end_day - start_day);
+    return day_span_seconds / std.time.s_per_day + 1;
+}
+
+pub fn formatDate(epoch: i64, buf: *[16]u8) []const u8 {
+    const local = local_time.fromUnixEpoch(epoch);
+    return std.fmt.bufPrint(buf, "{d:04}-{d:02}-{d:02}", .{
+        @as(u16, @intCast(local.year)),
+        @as(u4, @intCast(local.month)),
+        @as(u5, @intCast(local.day)),
+    }) catch unreachable;
+}
+
 /// Parse a user-supplied time string into a unix timestamp (stored as UTC epoch).
 ///
 /// All parsed values are interpreted in the system's local timezone.
@@ -188,6 +223,35 @@ test taskTotalSeconds {
         .{ .start = null, .end = 500 },
     };
     try std.testing.expectEqual(@as(u64, 210), taskTotalSeconds(&times));
+}
+
+test taskDateRange {
+    const empty = [_]TaskTimeEntry{};
+    try std.testing.expectEqual(@as(?i64, null), taskDateRange(&empty).start);
+
+    const open_last = [_]TaskTimeEntry{
+        .{ .start = 100, .end = 200 },
+        .{ .start = 500, .end = null },
+    };
+    const range = taskDateRange(&open_last);
+    try std.testing.expectEqual(@as(i64, 100), range.start.?);
+    try std.testing.expectEqual(@as(i64, 500), range.end.?);
+}
+
+test taskDateRangeDayCount {
+    local_time.testingSetUtcTimezone();
+
+    const same_day = TaskDateRange{
+        .start = 1_718_359_200, // 2024-06-14 10:00:00
+        .end = 1_718_366_400, // 2024-06-14 12:00:00
+    };
+    try std.testing.expectEqual(@as(?u64, 1), taskDateRangeDayCount(same_day));
+
+    const three_days = TaskDateRange{
+        .start = 1_718_359_200, // 2024-06-14
+        .end = 1_718_435_999, // 2024-06-16 23:59:59
+    };
+    try std.testing.expectEqual(@as(?u64, 3), taskDateRangeDayCount(three_days));
 }
 
 test parseTimeSpecifier {

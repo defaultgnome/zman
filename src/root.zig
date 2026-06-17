@@ -24,6 +24,10 @@ pub const formatTimestamp = time.formatTimestamp;
 pub const formatTimestampOpt = time.formatTimestampOpt;
 pub const timesOverlap = time.timesOverlap;
 pub const taskTotalSeconds = time.taskTotalSeconds;
+pub const TaskDateRange = time.TaskDateRange;
+pub const taskDateRange = time.taskDateRange;
+pub const taskDateRangeDayCount = time.taskDateRangeDayCount;
+pub const formatDate = time.formatDate;
 pub const parseTimeSpecifier = time.parseTimeSpecifier;
 
 pub const matchesPattern = pattern.matchesPattern;

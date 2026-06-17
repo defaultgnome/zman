@@ -2,9 +2,9 @@ const std = @import("std");
 const zman = @import("zman");
 
 pub fn printTaskLog(writer: anytype, task: zman.StoreMut.TaskMut) !void {
-    var total_buf: [32]u8 = undefined;
-    const total = zman.formatDurationSeconds(zman.taskTotalSeconds(task.times.items), &total_buf);
-    try writer.print("Task: {s}\nTotal: {s}\n\n", .{ task.name, total });
+    try writer.print("Task: {s}\n", .{task.name});
+    try printTaskSummary(writer, task);
+    try writer.writeAll("\n");
 
     const col_start = "Clock-in";
     const col_end = "Clock-out";
@@ -39,6 +39,36 @@ pub fn printTaskLog(writer: anytype, task: zman.StoreMut.TaskMut) !void {
             entryDisplayDuration(entry, &dur_buf),
         );
     }
+}
+
+fn printTaskSummary(writer: anytype, task: zman.StoreMut.TaskMut) !void {
+    var total_buf: [32]u8 = undefined;
+    const total = zman.formatDurationSeconds(zman.taskTotalSeconds(task.times.items), &total_buf);
+
+    const range = zman.taskDateRange(task.times.items);
+    const range_start = range.start orelse {
+        try writer.print("Total: {s}\n", .{total});
+        return;
+    };
+    const range_end = range.end orelse {
+        try writer.print("Total: {s}\n", .{total});
+        return;
+    };
+
+    var start_date_buf: [16]u8 = undefined;
+    var end_date_buf: [16]u8 = undefined;
+    const start_date = zman.formatDate(range_start, &start_date_buf);
+    const end_date = zman.formatDate(range_end, &end_date_buf);
+    const day_count = zman.taskDateRangeDayCount(range) orelse 0;
+    const day_label: []const u8 = if (day_count == 1) "day" else "days";
+
+    try writer.print("Total: {s}  ·  {s} → {s}  ·  {d} {s}\n", .{
+        total,
+        start_date,
+        end_date,
+        day_count,
+        day_label,
+    });
 }
 
 fn entryDisplayStart(entry: zman.TaskTimeEntry, buf: *[32]u8) []const u8 {
