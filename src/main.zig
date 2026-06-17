@@ -47,6 +47,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .cmd = .start, .run = runStart },
         .{ .cmd = .stop, .run = runStop },
         .{ .cmd = .log, .run = runLog },
+        .{ .cmd = .amend, .run = runAmend },
         .{ .cmd = .list, .run = runList },
         .{ .cmd = .delete, .run = runDelete },
         .{ .cmd = .merge, .run = runMerge },
@@ -134,8 +135,8 @@ fn runStop(app: *App, parsed: cli_args.Parsed) !void {
 
 fn runLog(app: *App, parsed: cli_args.Parsed) !void {
     if (parsed.positionals.len != 1) return error.MissingTaskName;
-    const from_text = parsed.log_from orelse return error.MissingLogFrom;
-    const to_text = parsed.log_to orelse return error.MissingLogTo;
+    const from_text = parsed.from orelse return error.MissingLogFrom;
+    const to_text = parsed.to orelse return error.MissingLogTo;
 
     const now = zman.unixNow(app.io);
     const from_epoch = try zman.parseTimeSpecifier(from_text, now);
@@ -152,6 +153,53 @@ fn runLog(app: *App, parsed: cli_args.Parsed) !void {
 
     const task_name = parsed.positionals[0];
     try store.addTimeEntry(task_name, .{ .start = from_epoch, .end = to_epoch });
+    try store.setLastTask(task_name);
+    try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
+}
+
+fn runAmend(app: *App, parsed: cli_args.Parsed) !void {
+    if (parsed.positionals.len != 2) return error.MissingAmendArgs;
+
+    const task_name = parsed.positionals[0];
+    const time_id = std.fmt.parseInt(usize, parsed.positionals[1], 10) catch return error.InvalidTimeEntryId;
+
+    if (parsed.amend_drop and (parsed.from != null or parsed.to != null)) return error.InvalidAmendFlags;
+    if (!parsed.amend_drop and parsed.from == null and parsed.to == null) return error.MissingAmendTime;
+
+    var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
+    defer config_dir.close(app.io);
+
+    var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
+    defer store.deinit();
+
+    if (parsed.amend_drop) {
+        try store.removeTimeEntryAt(task_name, time_id);
+        try store.setLastTask(task_name);
+        try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
+        return;
+    }
+
+    const task = store.findTask(task_name) orelse return error.TaskNotFound;
+    if (time_id >= task.times.items.len) return error.TimeEntryNotFound;
+
+    const existing = task.times.items[time_id];
+    const now = zman.unixNow(app.io);
+
+    const new_start: ?i64 = if (parsed.from) |text|
+        try zman.parseAmendTimeSpecifier(text, now, existing.start)
+    else
+        existing.start;
+
+    const new_end: ?i64 = if (parsed.to) |text|
+        try zman.parseAmendTimeSpecifier(text, now, existing.end)
+    else
+        existing.end;
+
+    if (new_start != null and new_end != null and new_start.? >= new_end.?) return error.InvalidLogRange;
+    if (new_start) |start| if (start > now) return error.FutureTime;
+    if (new_end) |end| if (end > now) return error.FutureTime;
+
+    try store.setTimeEntryAt(task_name, time_id, .{ .start = new_start, .end = new_end });
     try store.setLastTask(task_name);
     try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
 }

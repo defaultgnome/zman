@@ -67,6 +67,30 @@ pub fn format(err: anyerror) Formatted {
             .message = "missing --to time",
             .hint = "Usage: zman log <task-name> --from=<time> --to=<time>. Run 'zman log -h'.",
         },
+        error.MissingAmendArgs => .{
+            .message = "missing amend arguments",
+            .hint = "Usage: zman amend <task-name> <time-id>. Run 'zman amend -h'.",
+        },
+        error.MissingAmendTime => .{
+            .message = "missing amend option",
+            .hint = "Pass --from, --to, and/or --drop. Run 'zman amend -h'.",
+        },
+        error.InvalidAmendFlags => .{
+            .message = "--drop cannot be combined with --from or --to",
+            .hint = "Use --drop alone to remove an entry. Run 'zman amend -h'.",
+        },
+        error.InvalidTimeEntryId => .{
+            .message = "invalid time entry id",
+            .hint = "Use the row index from 'zman show' (0 is the first entry).",
+        },
+        error.TimeEntryNotFound => .{
+            .message = "time entry not found",
+            .hint = "Check the index with 'zman show <task-name>'.",
+        },
+        error.MissingAmendBase => .{
+            .message = "relative time requires an existing clock-in or clock-out",
+            .hint = "Set an absolute time, or amend the field that already has a value.",
+        },
         error.MissingFlagValue => .{
             .message = "flag requires a value",
             .hint = "Run 'zman <command> -h' for command-specific options.",

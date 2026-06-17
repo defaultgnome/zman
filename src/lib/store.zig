@@ -126,6 +126,24 @@ pub const StoreMut = struct {
         }
         try task.times.append(self.allocator, entry);
     }
+
+    pub fn removeTimeEntryAt(self: *StoreMut, name: []const u8, time_index: usize) !void {
+        const task = self.findTask(name) orelse return error.TaskNotFound;
+        if (time_index >= task.times.items.len) return error.TimeEntryNotFound;
+        _ = task.times.orderedRemove(time_index);
+    }
+
+    pub fn setTimeEntryAt(self: *StoreMut, name: []const u8, time_index: usize, entry: TaskTimeEntry) !void {
+        const task = self.findTask(name) orelse return error.TaskNotFound;
+        if (time_index >= task.times.items.len) return error.TimeEntryNotFound;
+
+        for (task.times.items, 0..) |existing, i| {
+            if (i == time_index) continue;
+            if (time.timesOverlap(existing, entry)) return error.TimeOverlap;
+        }
+
+        task.times.items[time_index] = entry;
+    }
 };
 
 pub fn nextUnnamedTaskName(store: *const StoreMut, allocator: std.mem.Allocator) ![]const u8 {

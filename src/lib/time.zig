@@ -123,6 +123,47 @@ pub fn parseTimeSpecifier(text: []const u8, now_epoch: i64) !i64 {
     });
 }
 
+/// Parse a time value for `amend`: absolute (same formats as `log`) or relative to an existing stamp.
+///
+/// Relative values start with `+` or `-` followed by `H:MM` or `H:MM:SS` and offset `base_epoch`.
+pub fn parseAmendTimeSpecifier(text: []const u8, now_epoch: i64, base_epoch: ?i64) !i64 {
+    const trimmed = std.mem.trim(u8, text, " \t\"'");
+
+    if (trimmed.len > 0 and (trimmed[0] == '+' or trimmed[0] == '-')) {
+        const base = base_epoch orelse return error.MissingAmendBase;
+        const sign = trimmed[0];
+        const duration_secs = try parseDurationSeconds(trimmed[1..]);
+        return switch (sign) {
+            '+' => base + duration_secs,
+            '-' => base - duration_secs,
+            else => unreachable,
+        };
+    }
+
+    return try parseTimeSpecifier(trimmed, now_epoch);
+}
+
+fn parseDurationSeconds(text: []const u8) !i64 {
+    var parts = std.mem.splitScalar(u8, text, ':');
+    const hour_text = parts.next() orelse return error.InvalidTimeFormat;
+    const minute_text = parts.next() orelse return error.InvalidTimeFormat;
+    const second_text = parts.next();
+    if (parts.next() != null) return error.InvalidTimeFormat;
+
+    const hours: i64 = try std.fmt.parseInt(i64, hour_text, 10);
+    const minutes: i64 = try std.fmt.parseInt(i64, minute_text, 10);
+    const seconds: i64 = if (second_text) |sec_text|
+        try std.fmt.parseInt(i64, sec_text, 10)
+    else
+        0;
+
+    if (hours < 0 or minutes < 0 or minutes > 59 or seconds < 0 or seconds > 59) {
+        return error.InvalidTimeFormat;
+    }
+
+    return hours * std.time.s_per_hour + minutes * std.time.s_per_min + seconds;
+}
+
 fn parseDateTime(text: []const u8) !i64 {
     const date_end = std.mem.indexOfScalar(u8, text, ' ') orelse
         std.mem.indexOfScalar(u8, text, 'T') orelse return error.InvalidTimeFormat;
@@ -274,6 +315,27 @@ test parseTimeSpecifier {
         @as(i64, 1_718_359_230),
         try parseTimeSpecifier("2024-06-14T10:00:30", now),
     );
+}
+
+test parseAmendTimeSpecifier {
+    local_time.testingSetUtcTimezone();
+
+    const now = 1_718_366_400; // 2024-06-14 12:00:00 local (TZ=UTC)
+    const base = 1_718_359_200; // 2024-06-14 10:00:00
+
+    try std.testing.expectEqual(
+        @as(i64, 1_718_363_700),
+        try parseAmendTimeSpecifier("+1:00", now, base),
+    );
+    try std.testing.expectEqual(
+        @as(i64, 1_718_353_700),
+        try parseAmendTimeSpecifier("-1:30", now, base),
+    );
+    try std.testing.expectEqual(
+        @as(i64, 1_718_359_230),
+        try parseAmendTimeSpecifier("10:00:30", now, base),
+    );
+    try std.testing.expectError(error.MissingAmendBase, parseAmendTimeSpecifier("-1:00", now, null));
 }
 
 test "formatTimestamp uses local timezone" {

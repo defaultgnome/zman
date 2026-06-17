@@ -10,6 +10,7 @@ pub const global_text =
     \\  start           Start a timer (Ctrl-C or Esc to stop)
     \\  stop            Close the last open time entry for a task
     \\  log             Add a manual clock-in/clock-out entry
+    \\  amend           Edit or remove an existing time entry
     \\  list            List all tasks with total time
     \\  delete          Delete tasks matching a glob pattern
     \\  merge           Merge one task's times into another
@@ -24,6 +25,7 @@ pub fn commandText(cmd: cli_args.Command) ?[]const u8 {
         .start => start_text,
         .stop => stop_text,
         .log => log_text,
+        .amend => amend_text,
         .list => list_text,
         .delete => delete_text,
         .merge => merge_text,
@@ -70,6 +72,32 @@ const log_text =
     \\Options:
     \\  --from=<time>   Clock-in time (required)
     \\  --to=<time>     Clock-out time (required)
+    \\
+;
+
+const amend_text =
+    \\Usage: zman amend <task-name> <time-id> [options]
+    \\
+    \\Edit or remove an existing time entry. <time-id> is the row index
+    \\shown by 'zman show' (0 is the first entry).
+    \\
+    \\Time formats (local time):
+    \\  HH:MM                   today at the given time
+    \\  HH:MM:SS                today at the given time
+    \\  YYYY-MM-DD HH:MM        full date and time
+    \\  YYYY-MM-DD HH:MM:SS     full date and time
+    \\  YYYY-MM-DDTHH:MM        ISO-style date and time
+    \\  YYYY-MM-DDTHH:MM:SS     ISO-style date and time
+    \\
+    \\Relative offsets (from the entry's current clock-in or clock-out):
+    \\  +H:MM                   add hours and minutes
+    \\  -H:MM                   subtract hours and minutes
+    \\  +H:MM:SS / -H:MM:SS     add or subtract with seconds
+    \\
+    \\Options:
+    \\  --from=<time>   New clock-in time (optional)
+    \\  --to=<time>     New clock-out time (optional)
+    \\  --drop          Remove the entry
     \\
 ;
 

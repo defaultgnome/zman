@@ -8,6 +8,7 @@ pub const Command = enum {
     start,
     stop,
     log,
+    amend,
     list,
     delete,
     merge,
@@ -22,8 +23,9 @@ pub const Parsed = struct {
     start_git: bool = false,
     list_name_only: bool = false,
     delete_yes: bool = false,
-    log_from: ?[]const u8 = null,
-    log_to: ?[]const u8 = null,
+    amend_drop: bool = false,
+    from: ?[]const u8 = null,
+    to: ?[]const u8 = null,
 };
 
 fn isFlag(arg: []const u8) bool {
@@ -70,10 +72,13 @@ pub fn parse(allocator: std.mem.Allocator, args: []const []const u8) !Parsed {
         } else if (std.mem.eql(u8, arg, "-y")) {
             if (cmd != .delete) return error.UnexpectedFlag;
             parsed.delete_yes = true;
-        } else if (try takeFlagValueArg(args, &i, "--from", &parsed.log_from)) {
-            if (cmd != .log) return error.UnexpectedFlag;
-        } else if (try takeFlagValueArg(args, &i, "--to", &parsed.log_to)) {
-            if (cmd != .log) return error.UnexpectedFlag;
+        } else if (std.mem.eql(u8, arg, "--drop")) {
+            if (cmd != .amend) return error.UnexpectedFlag;
+            parsed.amend_drop = true;
+        } else if (try takeFlagValueArg(args, &i, "--from", &parsed.from)) {
+            if (cmd != .log and cmd != .amend) return error.UnexpectedFlag;
+        } else if (try takeFlagValueArg(args, &i, "--to", &parsed.to)) {
+            if (cmd != .log and cmd != .amend) return error.UnexpectedFlag;
         } else return error.UnknownFlag;
     }
 

@@ -29,6 +29,7 @@ pub const taskDateRange = time.taskDateRange;
 pub const taskDateRangeDayCount = time.taskDateRangeDayCount;
 pub const formatDate = time.formatDate;
 pub const parseTimeSpecifier = time.parseTimeSpecifier;
+pub const parseAmendTimeSpecifier = time.parseAmendTimeSpecifier;
 
 pub const matchesPattern = pattern.matchesPattern;
 pub const gitBranchName = git.gitBranchName;
