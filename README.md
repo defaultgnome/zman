@@ -38,6 +38,7 @@ zman <command> -h            # help for a specific command
 | `zman list` | List tasks with total time |
 | `zman delete <pattern>` | Delete tasks matching a glob pattern |
 | `zman merge <from> <to>` | Merge time entries from one task into another |
+| `zman rename <name> <new>` | Rename a task |
 | `zman show <name>` | Print full clock-in/clock-out log for a task |
 
 ### `zman start`
@@ -128,6 +129,17 @@ zman merge old-name new-name
 
 On success, prints the merged result (same format as `zman show`).
 
+### `zman rename`
+
+Renames an existing task. Errors if the task is not found or the new name is already in use.
+
+```sh
+zman rename old-name new-name
+zman rename my-task --git       # rename to current git branch name
+```
+
+`<new-name>` and `--git` cannot be combined. See `zman rename -h`.
+
 ### `zman show`
 
 Prints a summary line (total time, date range, day count) and a table of every entry with a `#` index, clock-in, clock-out, and duration. Open entries show `N/A` for clock-out and duration.
@@ -176,6 +188,10 @@ zig build test
 ```
 
 ## Changes
+
+### v0.6.0
+
+- **Added** `zman rename` — rename a task to a new name or to the current git branch (`--git`)
 
 ### v0.5.0
 

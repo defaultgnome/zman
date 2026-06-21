@@ -12,6 +12,7 @@ pub const Command = enum {
     list,
     delete,
     merge,
+    rename,
     show,
 };
 
@@ -23,6 +24,7 @@ pub const Parsed = struct {
     start_git: bool = false,
     list_name_only: bool = false,
     delete_yes: bool = false,
+    rename_git: bool = false,
     amend_drop: bool = false,
     from: ?[]const u8 = null,
     to: ?[]const u8 = null,
@@ -64,8 +66,9 @@ pub fn parse(allocator: std.mem.Allocator, args: []const []const u8) !Parsed {
             if (cmd != .start) return error.UnexpectedFlag;
             parsed.start_last = true;
         } else if (std.mem.eql(u8, arg, "--git")) {
-            if (cmd != .start) return error.UnexpectedFlag;
-            parsed.start_git = true;
+            if (cmd != .start and cmd != .rename) return error.UnexpectedFlag;
+            if (cmd == .start) parsed.start_git = true;
+            if (cmd == .rename) parsed.rename_git = true;
         } else if (std.mem.eql(u8, arg, "--name-only")) {
             if (cmd != .list) return error.UnexpectedFlag;
             parsed.list_name_only = true;

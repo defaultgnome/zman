@@ -43,6 +43,18 @@ pub fn format(err: anyerror) Formatted {
             .message = "missing merge arguments",
             .hint = "Usage: zman merge <from> <to>. Run 'zman merge -h'.",
         },
+        error.MissingRenameArgs => .{
+            .message = "missing rename arguments",
+            .hint = "Usage: zman rename <task-name> <new-name> or zman rename <task-name> --git. Run 'zman rename -h'.",
+        },
+        error.InvalidRenameFlags => .{
+            .message = "incompatible rename options",
+            .hint = "Use either <new-name> or --git, not both. Run 'zman rename -h'.",
+        },
+        error.TaskNameTaken => .{
+            .message = "a task with that name already exists",
+            .hint = "Choose a different name or merge into the existing task with 'zman merge'.",
+        },
         error.MissingTaskName => .{
             .message = "missing task name",
             .hint = "Usage: zman show <task-name>. Run 'zman show -h'.",

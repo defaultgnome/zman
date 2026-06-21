@@ -14,6 +14,7 @@ pub const global_text =
     \\  list            List all tasks with total time
     \\  delete          Delete tasks matching a glob pattern
     \\  merge           Merge one task's times into another
+    \\  rename          Rename a task
     \\  show            Print full time log for a task
     \\
     \\Run 'zman <command> -h' for command-specific help.
@@ -29,6 +30,7 @@ pub fn commandText(cmd: cli_args.Command) ?[]const u8 {
         .list => list_text,
         .delete => delete_text,
         .merge => merge_text,
+        .rename => rename_text,
         .show => show_text,
         else => null,
     };
@@ -130,6 +132,18 @@ const merge_text =
     \\
     \\Move all time entries from <from> into <to>, then delete <from>.
     \\Aborts without changes if any time ranges overlap.
+    \\
+;
+
+const rename_text =
+    \\Usage: zman rename <task-name> <new-name>
+    \\   or: zman rename <task-name> --git
+    \\
+    \\Rename an existing task. Errors if the task is not found or the
+    \\new name is already in use.
+    \\
+    \\Options:
+    \\  --git           Use the current git branch name as the new name
     \\
 ;
 

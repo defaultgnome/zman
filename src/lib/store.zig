@@ -96,6 +96,20 @@ pub const StoreMut = struct {
         }
     }
 
+    pub fn renameTask(self: *StoreMut, from_name: []const u8, to_name: []const u8) !void {
+        const task = self.findTask(from_name) orelse return error.TaskNotFound;
+        if (std.mem.eql(u8, from_name, to_name)) return error.SameTask;
+        if (self.findTask(to_name) != null) return error.TaskNameTaken;
+
+        const old_name = task.name;
+        task.name = try self.allocator.dupe(u8, to_name);
+        self.allocator.free(old_name);
+
+        if (self.last_task) |lt| {
+            if (std.mem.eql(u8, lt, from_name)) try self.setLastTask(to_name);
+        }
+    }
+
     pub fn mergeTasks(self: *StoreMut, from_name: []const u8, to_name: []const u8) !void {
         const from = self.findTask(from_name) orelse return error.TaskNotFound;
         const to = self.findTask(to_name) orelse return error.TaskNotFound;
@@ -259,6 +273,44 @@ test "removeTask" {
     try std.testing.expect(store.removeTask("drop"));
     try std.testing.expectEqual(@as(usize, 1), store.tasks.items.len);
     try std.testing.expectEqualStrings("keep", store.tasks.items[0].name);
+}
+
+test "renameTask" {
+    var store = StoreMut{
+        .allocator = std.testing.allocator,
+        .tasks = std.ArrayList(StoreMut.TaskMut).empty,
+    };
+    defer store.deinit();
+
+    try store.tasks.append(std.testing.allocator, .{
+        .name = try std.testing.allocator.dupe(u8, "old-name"),
+        .times = std.ArrayList(TaskTimeEntry).empty,
+    });
+    try store.setLastTask("old-name");
+
+    try store.renameTask("old-name", "new-name");
+    try std.testing.expectEqual(@as(usize, 1), store.tasks.items.len);
+    try std.testing.expectEqualStrings("new-name", store.tasks.items[0].name);
+    try std.testing.expectEqualStrings("new-name", store.last_task.?);
+}
+
+test "renameTaskTaken" {
+    var store = StoreMut{
+        .allocator = std.testing.allocator,
+        .tasks = std.ArrayList(StoreMut.TaskMut).empty,
+    };
+    defer store.deinit();
+
+    try store.tasks.append(std.testing.allocator, .{
+        .name = try std.testing.allocator.dupe(u8, "from"),
+        .times = std.ArrayList(TaskTimeEntry).empty,
+    });
+    try store.tasks.append(std.testing.allocator, .{
+        .name = try std.testing.allocator.dupe(u8, "taken"),
+        .times = std.ArrayList(TaskTimeEntry).empty,
+    });
+
+    try std.testing.expectError(error.TaskNameTaken, store.renameTask("from", "taken"));
 }
 
 test "mergeTasks" {

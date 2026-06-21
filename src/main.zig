@@ -51,6 +51,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .cmd = .list, .run = runList },
         .{ .cmd = .delete, .run = runDelete },
         .{ .cmd = .merge, .run = runMerge },
+        .{ .cmd = .rename, .run = runRename },
         .{ .cmd = .show, .run = runShow },
     };
 
@@ -301,6 +302,33 @@ fn runMerge(app: *App, parsed: cli_args.Parsed) !void {
     var w = Io.File.stdout().writer(app.io, &buf);
     try w.interface.print("task {s} has been merged to {s}:\n\n", .{ from_name, to_name });
     try cli_output.printTaskLog(&w.interface, task.*);
+    try w.interface.flush();
+}
+
+fn runRename(app: *App, parsed: cli_args.Parsed) !void {
+    if (parsed.positionals.len < 1) return error.MissingRenameArgs;
+    if (parsed.rename_git and parsed.positionals.len > 1) return error.InvalidRenameFlags;
+    if (!parsed.rename_git and parsed.positionals.len != 2) return error.MissingRenameArgs;
+
+    const from_name = parsed.positionals[0];
+    const to_name = if (parsed.rename_git)
+        try zman.gitBranchName(app.io, app.allocator)
+    else
+        parsed.positionals[1];
+    defer if (parsed.rename_git) app.allocator.free(to_name);
+
+    var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
+    defer config_dir.close(app.io);
+
+    var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
+    defer store.deinit();
+
+    try store.renameTask(from_name, to_name);
+    try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
+
+    var buf: [256]u8 = undefined;
+    var w = Io.File.stdout().writer(app.io, &buf);
+    try w.interface.print("renamed from {s} to {s}\n", .{ from_name, to_name });
     try w.interface.flush();
 }
 
