@@ -189,6 +189,10 @@ zig build test
 
 ## Changes
 
+### v0.6.1
+
+- **Fixed** `zman rename --git` — now works in worktrees, and sub directories.
+
 ### v0.6.0
 
 - **Added** `zman rename` — rename a task to a new name or to the current git branch (`--git`)
