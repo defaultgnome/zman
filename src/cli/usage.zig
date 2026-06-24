@@ -85,10 +85,12 @@ const log_text =
 
 const amend_text =
     \\Usage: zman amend <task-name> <time-id> [options]
+    \\   or: zman amend <task-name> --last [options]
     \\   or: zman amend --git <time-id> [options]
+    \\   or: zman amend --git --last [options]
     \\
     \\Edit or remove an existing time entry. <time-id> is the row index
-    \\shown by 'zman show' (0 is the first entry).
+    \\shown by 'zman show' (0 is the first entry). --last targets the last entry.
     \\
     \\Time formats (local time):
     \\  HH:MM                   today at the given time
@@ -105,6 +107,7 @@ const amend_text =
     \\
     \\Options:
     \\  --git           Use the current git branch name as the task name
+    \\  --last          Amend the last time entry instead of <time-id>
     \\  --from=<time>   New clock-in time (optional)
     \\  --to=<time>     New clock-out time (optional)
     \\  --drop          Remove the entry

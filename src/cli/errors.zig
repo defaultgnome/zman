@@ -85,7 +85,7 @@ pub fn format(err: anyerror) Formatted {
         },
         error.MissingAmendArgs => .{
             .message = "missing amend arguments",
-            .hint = "Usage: zman amend <task-name> <time-id> or zman amend --git <time-id>. Run 'zman amend -h'.",
+            .hint = "Usage: zman amend <task-name> <time-id>, zman amend <task-name> --last, zman amend --git <time-id>, or zman amend --git --last. Run 'zman amend -h'.",
         },
         error.MissingAmendTime => .{
             .message = "missing amend option",

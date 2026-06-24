@@ -167,7 +167,6 @@ fn runAmend(app: *App, parsed: cli_args.Parsed) !void {
     defer cli_task_name.freeResolved(app.allocator, &resolved.task);
 
     const task_name_text = resolved.task.name;
-    const time_id = resolved.time_id;
 
     if (parsed.amend_drop and (parsed.from != null or parsed.to != null)) return error.InvalidAmendFlags;
     if (!parsed.amend_drop and parsed.from == null and parsed.to == null) return error.MissingAmendTime;
@@ -178,15 +177,19 @@ fn runAmend(app: *App, parsed: cli_args.Parsed) !void {
     var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
     defer store.deinit();
 
+    const task = store.findTask(task_name_text) orelse return error.TaskNotFound;
+    const time_id: usize = resolved.time_id orelse blk: {
+        if (task.times.items.len == 0) return error.NoTimeEntries;
+        break :blk task.times.items.len - 1;
+    };
+    if (time_id >= task.times.items.len) return error.TimeEntryNotFound;
+
     if (parsed.amend_drop) {
         try store.removeTimeEntryAt(task_name_text, time_id);
         try store.setLastTask(task_name_text);
         try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
         return;
     }
-
-    const task = store.findTask(task_name_text) orelse return error.TaskNotFound;
-    if (time_id >= task.times.items.len) return error.TimeEntryNotFound;
 
     const existing = task.times.items[time_id];
     const now = zman.unixNow(app.io);

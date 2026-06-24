@@ -25,11 +25,26 @@ pub fn resolveRequired(io: Io, allocator: std.mem.Allocator, parsed: cli_args.Pa
 
 pub const AmendResolved = struct {
     task: Resolved,
-    time_id: usize,
+    time_id: ?usize,
 };
 
-/// Resolves the task name for `amend`: `<task-name> <time-id>` or `--git <time-id>`.
+/// Resolves the task name for `amend`: `<task-name> <time-id>`, `--git <time-id>`,
+/// or `--last` with an optional task name / `--git`.
 pub fn resolveAmend(io: Io, allocator: std.mem.Allocator, parsed: cli_args.Parsed) !AmendResolved {
+    if (parsed.amend_last) {
+        if (parsed.task_git) {
+            if (parsed.positionals.len != 0) return error.MissingAmendArgs;
+            return .{
+                .task = .{ .name = try zman.gitBranchName(io, allocator), .owned = true },
+                .time_id = null,
+            };
+        }
+        if (parsed.positionals.len != 1) return error.MissingAmendArgs;
+        return .{
+            .task = .{ .name = parsed.positionals[0], .owned = false },
+            .time_id = null,
+        };
+    }
     if (parsed.task_git) {
         if (parsed.positionals.len != 1) return error.MissingAmendArgs;
         const time_id = std.fmt.parseInt(usize, parsed.positionals[0], 10) catch return error.InvalidTimeEntryId;

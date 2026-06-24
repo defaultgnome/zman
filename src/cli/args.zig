@@ -21,6 +21,7 @@ pub const Parsed = struct {
     help_target: ?Command = null,
     positionals: []const []const u8,
     start_last: bool = false,
+    amend_last: bool = false,
     task_git: bool = false,
     list_name_only: bool = false,
     delete_yes: bool = false,
@@ -63,8 +64,11 @@ pub fn parse(allocator: std.mem.Allocator, args: []const []const u8) !Parsed {
         }
 
         if (std.mem.eql(u8, arg, "--last")) {
-            if (cmd != .start) return error.UnexpectedFlag;
-            parsed.start_last = true;
+            switch (cmd) {
+                .start => parsed.start_last = true,
+                .amend => parsed.amend_last = true,
+                else => return error.UnexpectedFlag,
+            }
         } else if (std.mem.eql(u8, arg, "--git")) {
             switch (cmd) {
                 .start, .stop, .log, .amend, .show => parsed.task_git = true,
@@ -137,4 +141,16 @@ test parse {
     defer freeParsed(std.testing.allocator, &p5);
     try std.testing.expect(p5.task_git);
     try std.testing.expectEqualStrings("0", p5.positionals[0]);
+
+    const p6 = try parse(std.testing.allocator, &.{ "amend", "my-task", "--last", "--to=11:45" });
+    defer freeParsed(std.testing.allocator, &p6);
+    try std.testing.expect(p6.amend_last);
+    try std.testing.expectEqualStrings("my-task", p6.positionals[0]);
+    try std.testing.expectEqualStrings("11:45", p6.to.?);
+
+    const p7 = try parse(std.testing.allocator, &.{ "amend", "--git", "--last", "--drop" });
+    defer freeParsed(std.testing.allocator, &p7);
+    try std.testing.expect(p7.task_git);
+    try std.testing.expect(p7.amend_last);
+    try std.testing.expect(p7.positionals.len == 0);
 }
