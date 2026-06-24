@@ -10,6 +10,7 @@ const cli_errors = @import("cli/errors.zig");
 const cli_output = @import("cli/output.zig");
 const usage = @import("cli/usage.zig");
 const timer_input = @import("cli/timer_input.zig");
+const cli_task_name = @import("cli/task_name.zig");
 
 var timer_stop_requested = std.atomic.Value(bool).init(false);
 
@@ -103,9 +104,9 @@ fn runConfig(app: *App, _: cli_args.Parsed) !void {
 }
 
 fn runStart(app: *App, parsed: cli_args.Parsed) !void {
-    if (parsed.start_last and parsed.start_git) return error.InvalidStartFlags;
+    if (parsed.start_last and parsed.task_git) return error.InvalidStartFlags;
     if (parsed.start_last and parsed.positionals.len > 0) return error.InvalidStartFlags;
-    if (parsed.start_git and parsed.positionals.len > 0) return error.InvalidStartFlags;
+    if (parsed.task_git and parsed.positionals.len > 0) return error.InvalidStartFlags;
 
     var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
     defer config_dir.close(app.io);
@@ -120,7 +121,8 @@ fn runStart(app: *App, parsed: cli_args.Parsed) !void {
 }
 
 fn runStop(app: *App, parsed: cli_args.Parsed) !void {
-    if (parsed.positionals.len != 1) return error.MissingTaskName;
+    var resolved = try cli_task_name.resolveRequired(app.io, app.allocator, parsed);
+    defer cli_task_name.freeResolved(app.allocator, &resolved);
 
     var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
     defer config_dir.close(app.io);
@@ -128,16 +130,18 @@ fn runStop(app: *App, parsed: cli_args.Parsed) !void {
     var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
     defer store.deinit();
 
-    const task_name = parsed.positionals[0];
-    try store.stopLastOpenEntry(task_name, zman.unixNow(app.io));
-    try store.setLastTask(task_name);
+    const task_name_text = resolved.name;
+    try store.stopLastOpenEntry(task_name_text, zman.unixNow(app.io));
+    try store.setLastTask(task_name_text);
     try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
 }
 
 fn runLog(app: *App, parsed: cli_args.Parsed) !void {
-    if (parsed.positionals.len != 1) return error.MissingTaskName;
     const from_text = parsed.from orelse return error.MissingLogFrom;
     const to_text = parsed.to orelse return error.MissingLogTo;
+
+    var resolved = try cli_task_name.resolveRequired(app.io, app.allocator, parsed);
+    defer cli_task_name.freeResolved(app.allocator, &resolved);
 
     const now = zman.unixNow(app.io);
     const from_epoch = try zman.parseTimeSpecifier(from_text, now);
@@ -152,17 +156,18 @@ fn runLog(app: *App, parsed: cli_args.Parsed) !void {
     var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
     defer store.deinit();
 
-    const task_name = parsed.positionals[0];
-    try store.addTimeEntry(task_name, .{ .start = from_epoch, .end = to_epoch });
-    try store.setLastTask(task_name);
+    const task_name_text = resolved.name;
+    try store.addTimeEntry(task_name_text, .{ .start = from_epoch, .end = to_epoch });
+    try store.setLastTask(task_name_text);
     try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
 }
 
 fn runAmend(app: *App, parsed: cli_args.Parsed) !void {
-    if (parsed.positionals.len != 2) return error.MissingAmendArgs;
+    var resolved = try cli_task_name.resolveAmend(app.io, app.allocator, parsed);
+    defer cli_task_name.freeResolved(app.allocator, &resolved.task);
 
-    const task_name = parsed.positionals[0];
-    const time_id = std.fmt.parseInt(usize, parsed.positionals[1], 10) catch return error.InvalidTimeEntryId;
+    const task_name_text = resolved.task.name;
+    const time_id = resolved.time_id;
 
     if (parsed.amend_drop and (parsed.from != null or parsed.to != null)) return error.InvalidAmendFlags;
     if (!parsed.amend_drop and parsed.from == null and parsed.to == null) return error.MissingAmendTime;
@@ -174,13 +179,13 @@ fn runAmend(app: *App, parsed: cli_args.Parsed) !void {
     defer store.deinit();
 
     if (parsed.amend_drop) {
-        try store.removeTimeEntryAt(task_name, time_id);
-        try store.setLastTask(task_name);
+        try store.removeTimeEntryAt(task_name_text, time_id);
+        try store.setLastTask(task_name_text);
         try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
         return;
     }
 
-    const task = store.findTask(task_name) orelse return error.TaskNotFound;
+    const task = store.findTask(task_name_text) orelse return error.TaskNotFound;
     if (time_id >= task.times.items.len) return error.TimeEntryNotFound;
 
     const existing = task.times.items[time_id];
@@ -200,8 +205,8 @@ fn runAmend(app: *App, parsed: cli_args.Parsed) !void {
     if (new_start) |start| if (start > now) return error.FutureTime;
     if (new_end) |end| if (end > now) return error.FutureTime;
 
-    try store.setTimeEntryAt(task_name, time_id, .{ .start = new_start, .end = new_end });
-    try store.setLastTask(task_name);
+    try store.setTimeEntryAt(task_name_text, time_id, .{ .start = new_start, .end = new_end });
+    try store.setLastTask(task_name_text);
     try zman.saveStoreMut(app.io, config_dir, &store, app.allocator);
 }
 
@@ -212,7 +217,7 @@ fn resolveStartTaskName(app: *App, store: *zman.StoreMut, parsed: cli_args.Parse
         const last = store.last_task orelse return error.NoLastTask;
         return .{ .name = last, .owned = false };
     }
-    if (parsed.start_git) {
+    if (parsed.task_git) {
         return .{ .name = try zman.gitBranchName(app.io, app.allocator), .owned = true };
     }
     if (parsed.positionals.len > 0) {
@@ -333,7 +338,8 @@ fn runRename(app: *App, parsed: cli_args.Parsed) !void {
 }
 
 fn runShow(app: *App, parsed: cli_args.Parsed) !void {
-    if (parsed.positionals.len != 1) return error.MissingTaskName;
+    var resolved = try cli_task_name.resolveRequired(app.io, app.allocator, parsed);
+    defer cli_task_name.freeResolved(app.allocator, &resolved);
 
     var config_dir = try zman.openConfigDir(app.io, app.allocator, app.environ);
     defer config_dir.close(app.io);
@@ -341,7 +347,7 @@ fn runShow(app: *App, parsed: cli_args.Parsed) !void {
     var store = try zman.loadStoreMut(app.io, app.allocator, config_dir);
     defer store.deinit();
 
-    const task = store.findTask(parsed.positionals[0]) orelse return error.TaskNotFound;
+    const task = store.findTask(resolved.name) orelse return error.TaskNotFound;
 
     var buf: [512]u8 = undefined;
     var w = Io.File.stdout().writer(app.io, &buf);

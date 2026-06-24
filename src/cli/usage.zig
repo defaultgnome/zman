@@ -51,14 +51,19 @@ const start_text =
 
 const stop_text =
     \\Usage: zman stop <task-name>
+    \\   or: zman stop --git
     \\
     \\Close the last open clock-out for the given task using the current time.
     \\Errors if the task has no entries or the last entry is already closed.
+    \\
+    \\Options:
+    \\  --git           Use the current git branch name as the task name
     \\
 ;
 
 const log_text =
     \\Usage: zman log <task-name> --from=<time> --to=<time>
+    \\   or: zman log --git --from=<time> --to=<time>
     \\
     \\Add a manual clock-in/clock-out entry for a task.
     \\Aborts if the range overlaps an existing entry or is in the future.
@@ -72,6 +77,7 @@ const log_text =
     \\  YYYY-MM-DDTHH:MM:SS     ISO-style date and time
     \\
     \\Options:
+    \\  --git           Use the current git branch name as the task name
     \\  --from=<time>   Clock-in time (required)
     \\  --to=<time>     Clock-out time (required)
     \\
@@ -79,6 +85,7 @@ const log_text =
 
 const amend_text =
     \\Usage: zman amend <task-name> <time-id> [options]
+    \\   or: zman amend --git <time-id> [options]
     \\
     \\Edit or remove an existing time entry. <time-id> is the row index
     \\shown by 'zman show' (0 is the first entry).
@@ -97,6 +104,7 @@ const amend_text =
     \\  +H:MM:SS / -H:MM:SS     add or subtract with seconds
     \\
     \\Options:
+    \\  --git           Use the current git branch name as the task name
     \\  --from=<time>   New clock-in time (optional)
     \\  --to=<time>     New clock-out time (optional)
     \\  --drop          Remove the entry
@@ -137,7 +145,7 @@ const merge_text =
 
 const rename_text =
     \\Usage: zman rename <task-name> <new-name>
-    \\   or: zman rename <task-name> --git
+    \\   or: zman rename --git       <new-name>
     \\
     \\Rename an existing task. Errors if the task is not found or the
     \\new name is already in use.
@@ -149,8 +157,12 @@ const rename_text =
 
 const show_text =
     \\Usage: zman show <task-name>
+    \\   or: zman show --git
     \\
     \\Print a human-readable log of all clock-in/clock-out entries
     \\for the given task. Times are shown in your local timezone.
+    \\
+    \\Options:
+    \\  --git           Use the current git branch name as the task name
     \\
 ;

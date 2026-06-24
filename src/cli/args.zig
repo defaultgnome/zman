@@ -21,7 +21,7 @@ pub const Parsed = struct {
     help_target: ?Command = null,
     positionals: []const []const u8,
     start_last: bool = false,
-    start_git: bool = false,
+    task_git: bool = false,
     list_name_only: bool = false,
     delete_yes: bool = false,
     rename_git: bool = false,
@@ -66,9 +66,11 @@ pub fn parse(allocator: std.mem.Allocator, args: []const []const u8) !Parsed {
             if (cmd != .start) return error.UnexpectedFlag;
             parsed.start_last = true;
         } else if (std.mem.eql(u8, arg, "--git")) {
-            if (cmd != .start and cmd != .rename) return error.UnexpectedFlag;
-            if (cmd == .start) parsed.start_git = true;
-            if (cmd == .rename) parsed.rename_git = true;
+            switch (cmd) {
+                .start, .stop, .log, .amend, .show => parsed.task_git = true,
+                .rename => parsed.rename_git = true,
+                else => return error.UnexpectedFlag,
+            }
         } else if (std.mem.eql(u8, arg, "--name-only")) {
             if (cmd != .list) return error.UnexpectedFlag;
             parsed.list_name_only = true;
@@ -125,4 +127,14 @@ test parse {
     const p3 = try parse(std.testing.allocator, &.{ "delete", "-h" });
     try std.testing.expect(p3.command == .help);
     try std.testing.expect(p3.help_target.? == .delete);
+
+    const p4 = try parse(std.testing.allocator, &.{ "stop", "--git" });
+    defer freeParsed(std.testing.allocator, &p4);
+    try std.testing.expect(p4.task_git);
+    try std.testing.expect(p4.positionals.len == 0);
+
+    const p5 = try parse(std.testing.allocator, &.{ "amend", "--git", "0", "--drop" });
+    defer freeParsed(std.testing.allocator, &p5);
+    try std.testing.expect(p5.task_git);
+    try std.testing.expectEqualStrings("0", p5.positionals[0]);
 }

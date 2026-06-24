@@ -60,7 +60,10 @@ Closes the last open clock-out for the given task using the current time. Errors
 
 ```sh
 zman stop my-task
+zman stop --git             # use current git branch as task name
 ```
+
+`<task-name>` and `--git` cannot be combined. See `zman stop -h`.
 
 ### `zman log`
 
@@ -69,7 +72,10 @@ Adds a manual clock-in/clock-out entry. Aborts if the range overlaps an existing
 ```sh
 zman log my-task --from=09:00 --to=11:30
 zman log my-task --from="2026-06-10 09:00" --to="2026-06-10T11:30"
+zman log --git --from=09:00 --to=11:30
 ```
+
+`<task-name>` and `--git` cannot be combined. See `zman log -h`.
 
 **Time formats** (local time):
 
@@ -94,11 +100,12 @@ zman amend my-task 0 --to=11:45            # change clock-out
 zman amend my-task 0 --from=+0:15          # shift clock-in forward 15 minutes
 zman amend my-task 0 --to=-0:30            # shift clock-out back 30 minutes
 zman amend my-task 0 --drop                # remove the entry
+zman amend --git 0 --from=09:15            # amend entry on current git branch task
 ```
 
 Accepts the same absolute time formats as `zman log`, plus **relative offsets** from the entry's current value: `+H:MM`, `-H:MM`, `+H:MM:SS`, `-H:MM:SS`.
 
-`--drop` cannot be combined with `--from` or `--to`. At least one of `--from`, `--to`, or `--drop` is required. See `zman amend -h`.
+`--drop` cannot be combined with `--from` or `--to`. At least one of `--from`, `--to`, or `--drop` is required. `<task-name>` and `--git` cannot be combined. See `zman amend -h`.
 
 ### `zman list`
 
@@ -135,10 +142,10 @@ Renames an existing task. Errors if the task is not found or the new name is alr
 
 ```sh
 zman rename old-name new-name
-zman rename my-task --git       # rename to current git branch name
+zman rename --git new-name        # rename to current git branch name
 ```
 
-`<new-name>` and `--git` cannot be combined. See `zman rename -h`.
+Note: `--git` cannot be used here as target name.
 
 ### `zman show`
 
@@ -146,6 +153,7 @@ Prints a summary line (total time, date range, day count) and a table of every e
 
 ```sh
 zman show my-task
+zman show --git             # show task named after current git branch
 ```
 
 Example output:
@@ -169,6 +177,10 @@ With [fzf](https://github.com/junegunn/fzf) installed:
 # fuzzy-pick a task to inspect
 zman show "$(zman list --name-only | fzf)"
 
+# show or stop the task for the current git branch
+zman show --git
+zman stop --git
+
 # fuzzy-pick a task to stop
 zman stop "$(zman list --name-only | fzf)"
 
@@ -188,6 +200,10 @@ zig build test
 ```
 
 ## Changes
+
+### v0.7.0
+
+- **Added** `--git` on `stop`, `log`, `show`, and `amend` — use the current git branch name instead of `<task-name>`
 
 ### v0.6.1
 

@@ -31,6 +31,10 @@ pub fn format(err: anyerror) Formatted {
             .message = "not inside a git repository",
             .hint = "Run from a directory with a .git folder, or pass a task name instead.",
         },
+        error.InvalidTaskNameFlags => .{
+            .message = "incompatible task name options",
+            .hint = "Use either a task name or --git, not both. Run 'zman <command> -h'.",
+        },
         error.MissingPattern => .{
             .message = "missing delete pattern",
             .hint = "Usage: zman delete <pattern>. Use '*' to match all tasks. Run 'zman delete -h'.",
@@ -57,7 +61,7 @@ pub fn format(err: anyerror) Formatted {
         },
         error.MissingTaskName => .{
             .message = "missing task name",
-            .hint = "Usage: zman show <task-name>. Run 'zman show -h'.",
+            .hint = "Pass <task-name> or --git. Run 'zman <command> -h'.",
         },
         error.TaskNotFound => .{
             .message = "task not found",
@@ -81,7 +85,7 @@ pub fn format(err: anyerror) Formatted {
         },
         error.MissingAmendArgs => .{
             .message = "missing amend arguments",
-            .hint = "Usage: zman amend <task-name> <time-id>. Run 'zman amend -h'.",
+            .hint = "Usage: zman amend <task-name> <time-id> or zman amend --git <time-id>. Run 'zman amend -h'.",
         },
         error.MissingAmendTime => .{
             .message = "missing amend option",
